@@ -10,12 +10,29 @@ function echeanceValide(s) {
   return !isNaN(new Date(s).getTime());
 }
 
+// Harmonie reçoit des heures "21h40" en heure de Paris, mais le store et les
+// rappels comparent en UTC. Sans conversion explicite, un rappel d'été part
+// 2h en retard (1h en hiver) — silencieusement, la tâche a l'air bien créée.
+function versUTC(echeance) {
+  if (!echeance) return null;
+  const aUnDecalage = /Z$|[+-]\d{2}:?\d{2}$/.test(echeance);
+  if (aUnDecalage) return new Date(echeance).toISOString();
+
+  const approx = new Date(echeance + 'Z');
+  const partiesOffset = new Intl.DateTimeFormat('en-US', {
+    timeZone: 'Europe/Paris', timeZoneName: 'shortOffset',
+  }).formatToParts(approx);
+  const nomOffset = partiesOffset.find(p => p.type === 'timeZoneName').value; // ex: "GMT+2"
+  const heuresOffset = parseInt(nomOffset.replace('GMT', ''), 10) || 0;
+  return new Date(approx.getTime() - heuresOffset * 3600000).toISOString();
+}
+
 switch (cmd) {
   case 'ajouter': {
     const [texte, echeance] = args;
     if (!texte) { console.log('Erreur : texte manquant. Usage: ajouter "texte" ["2026-08-15T14:00"]'); process.exit(1); }
     if (!echeanceValide(echeance)) { console.log(`Erreur : échéance invalide "${echeance}", utiliser un format ISO (AAAA-MM-JJTHH:MM).`); process.exit(1); }
-    const t = store.ajouter(texte, echeance ? new Date(echeance).toISOString() : null);
+    const t = store.ajouter(texte, versUTC(echeance));
     console.log(`Ajouté [${t.id}] "${t.texte}"${t.echeance ? ' — échéance ' + t.echeance : ''}`);
     break;
   }
