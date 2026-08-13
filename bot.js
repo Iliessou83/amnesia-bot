@@ -1,4 +1,4 @@
-const { execSync, exec } = require('child_process');
+const { execFile } = require('child_process');
 const https = require('https');
 
 const BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
@@ -36,7 +36,7 @@ Réponds toujours en français, sois directe et opérationnelle.`;
 
   sendMessage(chatId, '⏳ Je réfléchis...');
 
-  exec(`claude -p "${fullPrompt.replace(/"/g, '\\"').replace(/\n/g, ' ')}"`,
+  execFile('claude', ['-p', fullPrompt],
     { timeout: 60000, maxBuffer: 1024 * 1024 * 10 },
     (err, stdout, stderr) => {
       if (err) {
@@ -78,9 +78,9 @@ function getUpdates() {
           const chatId = String(msg.chat.id);
           const text = msg.text.trim();
 
-          // Vérification accès
-          if (ALLOWED_IDS.length > 0 && !ALLOWED_IDS.includes(chatId)) {
-            sendMessage(chatId, '🔒 Accès non autorisé.');
+          // Vérification accès — fail-closed : une liste vide refuse tout le monde, pas l'inverse
+          if (ALLOWED_IDS.length === 0 || !ALLOWED_IDS.includes(chatId)) {
+            sendMessage(chatId, '🔒 Accès non configuré ou non autorisé.');
             continue;
           }
 

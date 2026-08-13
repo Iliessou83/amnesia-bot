@@ -1,4 +1,4 @@
-const { exec } = require('child_process');
+const { execFile } = require('child_process');
 const https = require('https');
 
 const BOT_TOKEN = process.env.HARMONIE_BOT_TOKEN;
@@ -19,8 +19,10 @@ function sendMessage(chatId, text) {
 }
 
 function askClaude(prompt, chatId) {
+  const maintenant = new Date().toLocaleString('fr-FR', { timeZone: 'Europe/Paris', dateStyle: 'full', timeStyle: 'short' });
   const systemContext = `Tu es Harmonie, secrétaire personnelle d'Ilies (24 ans, entrepreneur).
 Tu gères son agenda, ses priorités, ses projets et ses rappels.
+Nous sommes le : ${maintenant} (Europe/Paris) — sers-toi de cette date pour "demain", "mardi prochain", etc.
 
 SES PROJETS :
 - ADON.IA : réseau de closeurs B2B, Sales-as-a-Service
@@ -35,20 +37,27 @@ TON RÔLE :
 - Prioriser les tâches par impact
 - Suivre les deadlines et relancer si besoin
 - Préparer des récaps clairs et actionnables
-- Gérer les rappels et les suivis
+- Noter/lister/terminer ses rappels et RDV via l'outil dont tu disposes
+
+OUTIL DISPONIBLE (Bash, tu es déjà dans le bon dossier) :
+- Pour noter un RDV/rappel/tâche : node harmonie-cli.js ajouter "texte" "AAAA-MM-JJTHH:MM"
+- Pour lister les tâches ouvertes : node harmonie-cli.js liste
+- Pour marquer une tâche terminée : node harmonie-cli.js terminer <id>
+- Pour en supprimer une : node harmonie-cli.js supprimer <id>
+Utilise CET outil dès qu'Ilies te demande de noter/rappeler/planifier quelque chose — ne réponds jamais "c'est noté" sans avoir réellement appelé la commande.
 
 TON STYLE :
 - Française, professionnelle, efficace
 - Réponses courtes et actionnables
-- Toujours donner une prochaine action concrète
+- Agis directement (pas de brouillon à valider) puis confirme ce que tu as fait, SAUF tout ce qui implique un paiement : là, tu décris ce que tu proposes et tu attends l'accord explicite d'Ilies avant d'aller plus loin
 - Jamais de blabla inutile`;
 
   const fullPrompt = `${systemContext}\n\nDemande d'Ilies : ${prompt}`;
 
   sendMessage(chatId, '📋 Je traite ta demande...');
 
-  exec(`claude -p "${fullPrompt.replace(/"/g, '\\"').replace(/\n/g, ' ')}"`,
-    { timeout: 60000, maxBuffer: 1024 * 1024 * 10 },
+  execFile('claude', ['-p', fullPrompt, '--allowedTools', 'Bash(node harmonie-cli.js *)'],
+    { timeout: 90000, maxBuffer: 1024 * 1024 * 10, cwd: __dirname },
     (err, stdout, stderr) => {
       if (err) {
         sendMessage(chatId, `❌ Erreur : ${err.message}`);
@@ -87,8 +96,8 @@ function getUpdates() {
           const chatId = String(msg.chat.id);
           const text = msg.text.trim();
 
-          if (ALLOWED_IDS.length > 0 && !ALLOWED_IDS.includes(chatId)) {
-            sendMessage(chatId, '🔒 Accès non autorisé.');
+          if (ALLOWED_IDS.length === 0 || !ALLOWED_IDS.includes(chatId)) {
+            sendMessage(chatId, '🔒 Accès non configuré ou non autorisé.');
             continue;
           }
 
