@@ -19,6 +19,7 @@ const PORT = 5680;
 const SCRIPTS = {
   '/brief/matin': ['harmonie-brief.js', 'matin'],
   '/brief/soir': ['harmonie-brief.js', 'soir'],
+  '/brief/semaine': ['harmonie-brief.js', 'semaine'],
   '/watch/emails': ['harmonie-watch.js'],
 };
 
