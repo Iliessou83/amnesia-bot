@@ -2,6 +2,7 @@
 // CLI que Harmonie (Claude Code, via --allowedTools "Bash(node harmonie-cli.js *)") invoque
 // pour gérer les tâches/RDV persistés. Sortie texte simple, faite pour être lue par un LLM.
 const store = require('./store');
+const notes = require('./notes');
 
 const [, , cmd, ...args] = process.argv;
 
@@ -53,7 +54,25 @@ switch (cmd) {
     console.log(store.supprimer(id) ? `Supprimée : ${id}` : `Aucune tâche avec l'id ${id}`);
     break;
   }
+  case 'noter': {
+    const [texte] = args;
+    if (!texte) { console.log('Erreur : texte manquant. Usage: noter "texte"'); process.exit(1); }
+    const n = notes.ajouter(texte);
+    console.log(`Noté [${n.id}] "${n.texte}"`);
+    break;
+  }
+  case 'notes': {
+    const l = notes.lister();
+    if (l.length === 0) { console.log('Aucune note.'); break; }
+    console.log(l.map(n => `[${n.id}] ${n.texte}`).join('\n'));
+    break;
+  }
+  case 'oublier-note': {
+    const [id] = args;
+    console.log(notes.oublier(id) ? `Oubliée : ${id}` : `Aucune note avec l'id ${id}`);
+    break;
+  }
   default:
-    console.log('Commandes : ajouter "texte" ["AAAA-MM-JJTHH:MM"] | liste | terminer <id> | supprimer <id>');
+    console.log('Commandes : ajouter "texte" ["AAAA-MM-JJTHH:MM"] | liste | terminer <id> | supprimer <id> | noter "texte" | notes | oublier-note <id>');
     process.exit(1);
 }
