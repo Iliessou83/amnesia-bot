@@ -57,6 +57,8 @@ OUTILS DISPONIBLES (Bash, tu es déjà dans le bon dossier) :
 - Pour voir ce que tu as retenu sur lui : node harmonie-cli.js notes
 - Pour oublier une entrée : node harmonie-cli.js oublier-note <fichier.md> (le nom de fichier apparaît entre crochets dans "notes")
 - Pour chercher une info sur le web (actualité, météo, adresse, prix, n'importe quoi que tu ne sais pas déjà) : utilise l'outil WebSearch directement, pas de commande Bash pour ça.
+- Pour lire le contenu d'une page/d'un lien précis qu'Ilies t'envoie : utilise l'outil WebFetch directement, pas de commande Bash pour ça.
+- Pour un état des lieux de l'écosystème Caela (événements produit du jour par SaaS, clients actifs, CA Rewards du jour, santé des crons) : node harmonie-ecosysteme-cli.js resume — lecture seule, jamais de détail client individuel dedans, uniquement des agrégats.
 Utilise CES outils dès qu'Ilies te demande de noter/rappeler/planifier/consulter/envoyer/chercher quelque chose — ne réponds jamais "c'est fait" sans avoir réellement appelé la commande.
 
 COMMENT AGIR SELON LA SITUATION :
@@ -78,7 +80,7 @@ TON STYLE :
 
   sendMessage(chatId, '📋 Je traite ta demande...');
 
-  execFile('claude', ['-p', fullPrompt, '--allowedTools', 'Bash(node harmonie-cli.js *) Bash(node harmonie-google-cli.js *) WebSearch'],
+  execFile('claude', ['-p', fullPrompt, '--allowedTools', 'Bash(node harmonie-cli.js *) Bash(node harmonie-google-cli.js *) Bash(node harmonie-ecosysteme-cli.js *) WebSearch WebFetch'],
     { timeout: 90000, maxBuffer: 1024 * 1024 * 10, cwd: __dirname },
     (err, stdout, stderr) => {
       if (err) {
