@@ -147,6 +147,75 @@ async function envoyerEmail(destinataire, sujet, corps) {
   console.log(`Envoyé [${json.id}] à ${destinataire}`);
 }
 
+async function tachesListe() {
+  const token = await accessTokenFrais();
+  const { json } = await requeteJSON({
+    hostname: 'tasks.googleapis.com', path: '/tasks/v1/lists/@default/tasks?showCompleted=false',
+    headers: { Authorization: 'Bearer ' + token },
+  });
+  if (json.error) { console.log('Erreur Google Tasks : ' + json.error.message); return; }
+  const items = json.items || [];
+  if (!items.length) { console.log('Aucune tâche Google Tasks ouverte.'); return; }
+  const formatJour = (iso) => new Date(iso).toLocaleDateString('fr-FR', { timeZone: 'UTC', weekday: 'short', day: 'numeric', month: 'short' });
+  console.log(items.map(t => `[${t.id}] ${t.title}${t.due ? ' — échéance ' + formatJour(t.due) : ''}`).join('\n'));
+}
+
+// L'API Google Tasks accepte un `due` en RFC3339 mais IGNORE silencieusement
+// l'heure : elle stocke toujours minuit UTC, sans erreur ni avertissement.
+// Inutile de faire croire à une heure précise — on n'envoie que la date.
+async function tacheAjouter(titre, echeanceNaif) {
+  const token = await accessTokenFrais();
+  const body = JSON.stringify({
+    title: titre,
+    due: echeanceNaif ? echeanceNaif.slice(0, 10) + 'T00:00:00.000Z' : undefined,
+  });
+  const { json } = await requeteJSON({
+    hostname: 'tasks.googleapis.com', path: '/tasks/v1/lists/@default/tasks', method: 'POST',
+    headers: { Authorization: 'Bearer ' + token, 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(body) },
+    body,
+  });
+  if (json.error) { console.log('Erreur création tâche : ' + json.error.message); return; }
+  console.log(`Créée [${json.id}] "${json.title}"`);
+}
+
+async function tacheTerminer(id) {
+  const token = await accessTokenFrais();
+  const body = JSON.stringify({ status: 'completed' });
+  const { json } = await requeteJSON({
+    hostname: 'tasks.googleapis.com', path: `/tasks/v1/lists/@default/tasks/${id}`, method: 'PATCH',
+    headers: { Authorization: 'Bearer ' + token, 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(body) },
+    body,
+  });
+  if (json.error) { console.log('Erreur : ' + json.error.message); return; }
+  console.log(`Terminée : ${id}`);
+}
+
+// People API searchContacts a besoin d'un cache "chauffé" côté Google, pas fiable
+// juste après consentement. On liste les connexions et on filtre nous-mêmes.
+async function contacts(recherche) {
+  const token = await accessTokenFrais();
+  const { json } = await requeteJSON({
+    hostname: 'people.googleapis.com',
+    path: '/v1/people/me/connections?pageSize=200&personFields=names,emailAddresses,phoneNumbers',
+    headers: { Authorization: 'Bearer ' + token },
+  });
+  if (json.error) { console.log('Erreur Contacts : ' + json.error.message); return; }
+  const gens = json.connections || [];
+  const aiguille = (recherche || '').toLowerCase();
+  const filtres = gens.filter(p => {
+    if (!aiguille) return true;
+    const nom = (p.names?.[0]?.displayName || '').toLowerCase();
+    return nom.includes(aiguille);
+  });
+  if (!filtres.length) { console.log('Aucun contact trouvé.'); return; }
+  console.log(filtres.map(p => {
+    const nom = p.names?.[0]?.displayName || '(sans nom)';
+    const email = p.emailAddresses?.[0]?.value || '';
+    const tel = p.phoneNumbers?.[0]?.value || '';
+    return `${nom}${email ? ' — ' + email : ''}${tel ? ' — ' + tel : ''}`;
+  }).join('\n'));
+}
+
 const [, , cmd, ...args] = process.argv;
 
 (async () => {
@@ -157,8 +226,12 @@ const [, , cmd, ...args] = process.argv;
       case 'supprimer-evenement': await supprimerEvenement(args[0]); break;
       case 'emails': await emails(args[0] ? parseInt(args[0], 10) : 5); break;
       case 'envoyer-email': await envoyerEmail(args[0], args[1], args[2]); break;
+      case 'taches-liste': await tachesListe(); break;
+      case 'tache-ajouter': await tacheAjouter(args[0], args[1]); break;
+      case 'tache-terminer': await tacheTerminer(args[0]); break;
+      case 'contacts': await contacts(args[0]); break;
       default:
-        console.log('Commandes : agenda [jours] | creer-evenement "titre" "AAAA-MM-JJTHH:MM" ["fin"] | supprimer-evenement <id> | emails [max] | envoyer-email "destinataire" "sujet" "corps"');
+        console.log('Commandes : agenda [jours] | creer-evenement "titre" "AAAA-MM-JJTHH:MM" ["fin"] | supprimer-evenement <id> | emails [max] | envoyer-email "destinataire" "sujet" "corps" | taches-liste | tache-ajouter "titre" ["AAAA-MM-JJTHH:MM"] | tache-terminer <id> | contacts ["nom"]');
         process.exit(1);
     }
   } catch (e) {
