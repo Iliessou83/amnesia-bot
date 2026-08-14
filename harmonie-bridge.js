@@ -19,6 +19,7 @@ const PORT = 5680;
 const SCRIPTS = {
   '/brief/matin': ['harmonie-brief.js', 'matin'],
   '/brief/soir': ['harmonie-brief.js', 'soir'],
+  '/watch/emails': ['harmonie-watch.js'],
 };
 
 const server = http.createServer((req, res) => {
@@ -35,13 +36,14 @@ const server = http.createServer((req, res) => {
   res.end(JSON.stringify({ ok: true, lance: handler.join(' ') }));
 
   const [script, arg] = handler;
-  execFile('node', [script, arg], { cwd: __dirname, timeout: 150000 }, (err, stdout, stderr) => {
+  const argv = arg ? [script, arg] : [script];
+  execFile('node', argv, { cwd: __dirname, timeout: 150000 }, (err, stdout, stderr) => {
     const horodatage = new Date().toISOString();
     if (err) {
-      console.error(`[harmonie-bridge] ${horodatage} erreur ${script} ${arg} :`, err.message, stderr);
+      console.error(`[harmonie-bridge] ${horodatage} erreur ${argv.join(' ')} :`, err.message, stderr);
       return;
     }
-    console.log(`[harmonie-bridge] ${horodatage} ${script} ${arg} terminé :`, stdout.trim());
+    console.log(`[harmonie-bridge] ${horodatage} ${argv.join(' ')} terminé :`, stdout.trim());
   });
 });
 

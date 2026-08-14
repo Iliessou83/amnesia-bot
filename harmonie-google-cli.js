@@ -6,6 +6,8 @@ const https = require('https');
 const fs = require('fs');
 const path = require('path');
 
+const emailsVus = require('./emails-vus');
+
 const CREDS_PATH = path.join(__dirname, 'google-client-secret.json');
 const TOKEN_PATH = path.join(__dirname, 'data', 'google-token.json');
 
@@ -127,6 +129,36 @@ async function emails(max = 5) {
   console.log(details.join('\n'));
 }
 
+// Pour la veille automatique (n8n, toutes les X minutes) : ne renvoie QUE les
+// emails non lus jamais présentés à un run précédent (dédupliqué via
+// emails-vus.js), avec un extrait du contenu pour que le jugement d'urgence
+// ne se fasse pas sur le seul sujet. Les marque vus avant de rendre la main :
+// mieux vaut rater une alerte en cas de crash juste après que la spammer en
+// boucle si le run suivant les revoit comme "nouveaux".
+async function emailsNouveaux(max = 20) {
+  const token = await accessTokenFrais();
+  const { json: liste } = await requeteJSON({
+    hostname: 'www.googleapis.com', path: `/gmail/v1/users/me/messages?maxResults=${max}&q=is:unread`,
+    headers: { Authorization: 'Bearer ' + token },
+  });
+  if (liste.error) { console.log('Erreur Gmail : ' + liste.error.message); return; }
+  const msgs = (liste.messages || []).filter(m => !emailsVus.dejaVu(m.id));
+  if (!msgs.length) { console.log('Aucun nouvel email.'); return; }
+  const details = await Promise.all(msgs.map(async (m) => {
+    const { json } = await requeteJSON({
+      hostname: 'www.googleapis.com',
+      path: `/gmail/v1/users/me/messages/${m.id}?format=metadata&metadataHeaders=Subject&metadataHeaders=From`,
+      headers: { Authorization: 'Bearer ' + token },
+    });
+    const headers = json.payload?.headers || [];
+    const get = (n) => headers.find(h => h.name === n)?.value || '';
+    const extrait = (json.snippet || '').slice(0, 200);
+    return `[${m.id}] De : ${get('From').split('<')[0].trim()} — Sujet : ${get('Subject')} — Extrait : ${extrait}`;
+  }));
+  emailsVus.marquerVus(msgs.map(m => m.id));
+  console.log(details.join('\n'));
+}
+
 async function envoyerEmail(destinataire, sujet, corps) {
   const token = await accessTokenFrais();
   const message = [
@@ -225,6 +257,7 @@ const [, , cmd, ...args] = process.argv;
       case 'creer-evenement': await creerEvenement(args[0], args[1], args[2]); break;
       case 'supprimer-evenement': await supprimerEvenement(args[0]); break;
       case 'emails': await emails(args[0] ? parseInt(args[0], 10) : 5); break;
+      case 'emails-nouveaux': await emailsNouveaux(args[0] ? parseInt(args[0], 10) : 20); break;
       case 'envoyer-email': await envoyerEmail(args[0], args[1], args[2]); break;
       case 'taches-liste': await tachesListe(); break;
       case 'tache-ajouter': await tacheAjouter(args[0], args[1]); break;
