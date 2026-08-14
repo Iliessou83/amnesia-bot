@@ -54,25 +54,19 @@ switch (cmd) {
     console.log(store.supprimer(id) ? `Supprimée : ${id}` : `Aucune tâche avec l'id ${id}`);
     break;
   }
-  case 'noter': {
-    const [texte] = args;
-    if (!texte) { console.log('Erreur : texte manquant. Usage: noter "texte"'); process.exit(1); }
-    const n = notes.ajouter(texte);
-    console.log(`Noté [${n.id}] "${n.texte}"`);
-    break;
-  }
   case 'notes': {
     const l = notes.lister();
-    if (l.length === 0) { console.log('Aucune note.'); break; }
-    console.log(l.map(n => `[${n.id}] ${n.texte}`).join('\n'));
+    if (l.length === 0) { console.log('Rien en mémoire pour l\'instant.'); break; }
+    console.log(l.map(n => `[${n.fichier}] ${n.titre}${n.resume ? ' — ' + n.resume : ''}`).join('\n'));
     break;
   }
   case 'oublier-note': {
-    const [id] = args;
-    console.log(notes.oublier(id) ? `Oubliée : ${id}` : `Aucune note avec l'id ${id}`);
+    const [fichier] = args;
+    if (!fichier) { console.log('Erreur : fichier manquant. Usage: oublier-note <fichier.md> (voir "notes" pour la liste)'); process.exit(1); }
+    console.log(notes.oublier(fichier) ? `Oubliée : ${fichier}` : `Aucune entrée pour ${fichier}`);
     break;
   }
   default:
-    console.log('Commandes : ajouter "texte" ["AAAA-MM-JJTHH:MM"] | liste | terminer <id> | supprimer <id> | noter "texte" | notes | oublier-note <id>');
+    console.log('Commandes : ajouter "texte" ["AAAA-MM-JJTHH:MM"] | liste | terminer <id> | supprimer <id> | notes | oublier-note <fichier.md>');
     process.exit(1);
 }
